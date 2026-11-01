@@ -2,7 +2,7 @@
 
 Control an EYOCEAN desk lamp through Home Assistant's native `radio_frequency` integration. This custom integration works with any registered compatible 433.92 MHz OOK adapter. It does not call ESPHome services or hardcode GPIOs or IP addresses.
 
-Tested against **Home Assistant Core 2026.10.4 and rf-protocols 4.3.0**, without physical RF transmission or lamp-response testing. The native RF APIs are recent; compatibility with other Home Assistant versions needs to be checked separately.
+Tested against **Home Assistant Core 2026.10.4 and rf-protocols 4.3.0**. Physical RF transmission and lamp response have not been tested. The native RF APIs are recent, so check compatibility before using another Home Assistant version.
 
 ## What it exposes
 
@@ -17,7 +17,7 @@ One device with six stateless buttons:
 | Night light | `0x41` by default |
 | Timer | `0x4D` by default |
 
-Enable **Swap Night light and Timer command codes** for variants where those functions are reversed. A remote variant may not support every listed function; disable unsupported button entities in Home Assistant.
+Enable **Swap Night light and Timer command codes** if those functions are reversed on your remote. Some remotes may not support every function; disable unsupported button entities in Home Assistant.
 
 The lamp has no feedback channel, and the known commands toggle or cycle its settings. The integration therefore exposes buttons, not a light entity, an absolute brightness slider, or a confirmed on/off state. Button timestamps record requests, not lamp responses. The integration tracks adapter availability and reports transmitter errors to Home Assistant.
 
@@ -63,12 +63,12 @@ The button requires [My Home Assistant](https://my.home-assistant.io/) configure
    ```
 
    The release ZIP contains the `custom_components/eyocean/` layout and README. Extract it into the HA configuration directory, not inside another `eyocean` subdirectory. The project root's `custom_components/__init__.py` is a test-discovery helper and is not included in the ZIP.
-3. Restart Home Assistant when you are ready. The project does not install itself or restart Home Assistant.
+3. Restart Home Assistant.
 4. Add your lamp under [Configuration](#configuration).
 
 ## Capturing `remote_id` and `xor_key`
 
-Capture these values from your original lamp remote before configuring the integration. Both [ESPHome proxy examples](#esphome-proxy-examples) include a candidate decoder for the supported 32-bit EYOCEAN protocol:
+Capture these values from your original lamp remote before setup. Both [ESPHome proxy examples](#esphome-proxy-examples) can decode candidate frames using the supported 32-bit EYOCEAN protocol:
 
 | Example | Capture hardware | Where to read the values |
 |---|---|---|
@@ -76,17 +76,17 @@ Capture these values from your original lamp remote before configuring the integ
 | [T-Embed CC1101 Plus guide](examples/t-embed-cc1101-plus.md) / [YAML](examples/t-embed-cc1101-plus.yaml) | Built-in CC1101 configured for 433.92 MHz ASK/OOK | On-device display, ESPHome logs, or **Decoded remote ID** and **Decoded XOR key** text sensors in Home Assistant |
 
 1. Follow the chosen hardware guide to wire, configure and flash the device. Receiving requires a working RF receiver and antenna; a transmitter alone cannot capture the remote.
-2. Open the device's ESPHome logs, or watch the T-Embed display. Candidate messages appear at INFO level; DEBUG is only needed to inspect raw pulse dumps.
-3. Press a button on your original lamp remote. A recognized candidate produces a message such as:
+2. Open the device's ESPHome logs, or watch the T-Embed display. Candidate messages use INFO logging; raw pulse dumps need DEBUG.
+3. Press a button on your original lamp remote. If the decoder recognizes a candidate frame, it logs a message such as:
 
    ```text
    Candidate frame=0xC6FB5109 remote_id=0xC6FB xor_key=0x58 command=0x51
    ```
 
-4. Press several different remote buttons. Check that `remote_id` and `xor_key` stay the same while `command` changes. Repeated frames can produce multiple messages from one press. On the T-Embed, **Frames** counts accepted candidates and **Age** shows seconds since the latest candidate; neither confirms lamp state.
+4. Press several different remote buttons. Check that `remote_id` and `xor_key` stay the same while `command` changes. One press can produce several messages because the remote repeats each frame. On the T-Embed, **Frames** counts accepted candidates and **Age** shows seconds since the latest candidate. Neither reports lamp state.
 5. In [Configuration](#configuration), select your RF transmitter and enter the captured `remote_id` as **Remote ID** and `xor_key` as **XOR key**. For the example above, those would be `0xC6FB` and `0x58`. Do not enter the full frame (`0xC6FB5109`) or the command byte (`0x51`) in either field.
 
-**These values are examples, not defaults for your lamp.** The decoder checks pulse timing and known command bytes, but a candidate does not prove that the remote belongs to your lamp. Other compatible remotes can update the displayed values. Capturing does not pair the lamp, send a command, or automatically configure the integration. It also does not overwrite the T-Embed YAML's optional local-button identity; Home Assistant integration buttons use the identity entered in Home Assistant.
+The values above are examples, not defaults for your lamp. The decoder checks pulse timing and known command bytes, but cannot tell whether a remote belongs to your lamp. Other compatible remotes can change the displayed values. Capture does not pair the lamp, transmit a command, or configure the integration or the T-Embed's local-button identity. Home Assistant integration buttons use the identity you enter in Home Assistant.
 
 If no candidate appears, check receiver wiring/power, antenna, frequency and remote compatibility. Enable DEBUG logging to inspect raw pulses. The T-Embed's **Allow RF control** switch can remain off during capture; it only guards its optional local lamp buttons.
 
@@ -100,7 +100,7 @@ Alternatively, go to **Settings → Devices & services → Add integration → E
 
 ![EYOCEAN integration setup](image-1.png)
 
-Choose your RF transmitter and enter a lamp name, remote ID, XOR key and repeat count. Enable the Night/Timer swap if your remote needs it. Have the values listed under [Prerequisites](#prerequisites) ready; installation does not configure the transmitter or capture the remote ID and XOR key.
+Choose your RF transmitter and enter a lamp name, remote ID, XOR key and repeat count. Enable the Night/Timer swap if your remote needs it. Check the [prerequisites](#prerequisites) and [capture your remote ID and XOR key](#capturing-remote_id-and-xor_key) before starting setup.
 
 The remote ID accepts one to four hexadecimal digits; the XOR key accepts one to two. Both allow an optional `0x` prefix. The remote ID cannot be zero; the XOR key can. Do not paste a full 32-bit frame into the remote-ID field. Setup rejects duplicate ID/key pairs, even across different adapters, because each pair identifies the same RF remote command group.
 
@@ -117,13 +117,16 @@ Complete ESPHome configurations are in [`examples/`](examples):
 | [`m5stack-atom-lite.yaml`](examples/m5stack-atom-lite.yaml) | [M5Stack ATOM Lite](examples/m5stack-atom-lite.md) with an external 433.92 MHz OOK transmitter/receiver | RF proxy, candidate remote-ID/key logging, RGB LED and button |
 | [`t-embed-cc1101-plus.yaml`](examples/t-embed-cc1101-plus.yaml) | [LILYGO T-Embed CC1101 Plus](examples/t-embed-cc1101-plus.md) | CC1101 RF proxy, IR proxy, candidate decode display and optional local lamp buttons |
 
-These are sanitized versions of device configurations, not drop-in configurations for every board revision. The ATOM Lite example uses GPIO25 for external TX data and GPIO19 for RX data; the ATOM Lite has no built-in RF radio. Check the attached module's wiring, power requirements and logic levels. The T-Embed example uses the CC1101 Plus pinout, initializes the 433 MHz antenna path, and leaves SD and nRF24L01 inactive. It does not configure NFC or charger control.
+The examples have credentials and remote identities removed. Check your board revision and wiring before using them:
 
-Use ESPHome **2026.10.1 or later**, checking compatibility if you use a different release. Copy one YAML file into your ESPHome configuration directory. Provide `api_key`, `wifi_ssid` and `wifi_password` in your private `secrets.yaml`; generate a separate API key for the device with `openssl rand -base64 32`. Keep secrets out of version control. The T-Embed display downloads Roboto Mono from Google Fonts during validation/build.
+- The ATOM Lite has no built-in RF radio. Its example uses GPIO25 for external TX data and GPIO19 for RX data. Check the attached module's power requirements and logic levels.
+- The T-Embed example uses the CC1101 Plus pinout and selects the 433 MHz antenna path. SD and nRF24L01 stay inactive; NFC and charger control are not configured.
+
+The examples require ESPHome **2026.10.1 or later**; check compatibility when using another release. Copy one YAML file into your ESPHome configuration directory. Add `api_key`, `wifi_ssid` and `wifi_password` to your private `secrets.yaml`. Generate a separate API key for the device with `openssl rand -base64 32`, and keep secrets out of version control. The T-Embed display downloads Roboto Mono from Google Fonts during validation or compilation.
 
 Add the flashed device to Home Assistant through the ESPHome integration, then select its **433MHz RF Transmitter** when configuring this integration. Neither example sends RF at boot. Their proxy transmitters accept Home Assistant requests without a local permission switch.
 
-The T-Embed's optional local lamp buttons start disabled: `remote_id` and `xor_key` are zeroed, and **Allow RF control** resets to off at boot. To use those buttons, enter your own captured identity and enable the switch. **The switch does not block RF or IR proxy transmissions.** Home Assistant integration buttons use the remote ID/key entered in Home Assistant, not the YAML substitutions. Candidate decodes are not proof that a remote belongs to your lamp and never overwrite the configured identity. Raw dumps need DEBUG logging; candidate-frame messages use INFO.
+To use the T-Embed's optional local lamp buttons, replace the zeroed `remote_id` and `xor_key` in the YAML with your captured values, then enable **Allow RF control**. The switch resets to off at boot and **does not block RF or IR proxy transmissions**. Home Assistant integration buttons use the identity entered in Home Assistant, not the YAML substitutions. Decoded candidates never overwrite the configured identity.
 
 If your device already has `rf_tx`, add this alongside its other top-level components:
 
@@ -135,7 +138,7 @@ radio_frequency:
     remote_transmitter_id: rf_tx
 ```
 
-The referenced `remote_transmitter` must have `carrier_duty_percent: 100%`. With CC1101, it must enter TX via `cc1101.begin_tx` before sending and return to RX via `cc1101.begin_rx` on completion. Do not copy generic GPIOs onto the T-Embed. These buttons transmit directly through the proxy. An ESPHome switch that guards a separate lamp-button script **does not block proxy transmissions**.
+The referenced `remote_transmitter` must have `carrier_duty_percent: 100%`. With CC1101, it must enter TX via `cc1101.begin_tx` before sending and return to RX via `cc1101.begin_rx` on completion. Do not copy generic GPIOs onto the T-Embed. Integration buttons transmit directly through the proxy, bypassing switches that guard separate ESPHome lamp-button scripts.
 
 Do not add a second `radio_frequency:` key if your YAML already has one; merge entries. A transmitter appearing in **Settings → Connectivity → Radio Frequency** should be offered when it declares the matching frequency and modulation.
 

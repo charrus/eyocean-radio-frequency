@@ -1,13 +1,13 @@
 # LILYGO T-Embed CC1101 Plus
 
-The [ESPHome configuration](t-embed-cc1101-plus.yaml) uses the built-in CC1101 as a **433.92 MHz ASK/OOK RF proxy**, displays candidate EYOCEAN remote identities, and exposes the built-in IR transmitter and receiver. It also includes six optional ESPHome lamp buttons.
+Use the built-in CC1101 as a 433.92 MHz ASK/OOK RF proxy for Home Assistant. The [ESPHome configuration](t-embed-cc1101-plus.yaml) displays candidate EYOCEAN remote IDs and XOR keys, provides an IR proxy through the built-in transmitter and receiver, and includes six optional local lamp buttons.
 
-This example targets the **T-Embed CC1101 Plus** pinout, not the original T-Embed. Check your board revision before flashing. SD and nRF24L01 are held inactive; NFC, charger control, rotary controls and raw recording/replay are not configured.
+This example uses the **T-Embed CC1101 Plus** pinout, not the original T-Embed pinout. Check your board revision before flashing. SD and nRF24L01 stay inactive. NFC, charger control, rotary controls and raw recording/replay are not configured.
 
 ## Setup
 
-1. Copy [t-embed-cc1101-plus.yaml](t-embed-cc1101-plus.yaml) into your ESPHome configuration directory. The file declares ESPHome **2026.10.1** as its minimum version.
-2. Customize `name` and `friendly_name`. Leave `remote_id` and `xor_key` at their placeholder values if you only want to capture a remote or use the Home Assistant integration.
+1. Copy [t-embed-cc1101-plus.yaml](t-embed-cc1101-plus.yaml) into your ESPHome configuration directory. It requires ESPHome **2026.10.1** or later.
+2. Set `name` and `friendly_name`. Leave `remote_id` and `xor_key` at zero if you only want to capture a remote or use the Home Assistant integration.
 3. Add these entries to your private `secrets.yaml` alongside the copied configuration:
 
    ```yaml
@@ -25,14 +25,14 @@ This example targets the **T-Embed CC1101 Plus** pinout, not the original T-Embe
    esphome logs t-embed-cc1101-plus.yaml
    ```
 
-   The display downloads Roboto Mono from Google Fonts during validation/build, requiring network access or an already cached font.
+   The display uses Roboto Mono from Google Fonts. Validation and compilation need network access unless the font is already cached.
 5. Add the device through Home Assistant's ESPHome integration. It exposes **433MHz RF Transmitter**, **433MHz RF Receiver**, **IR Transmitter** and **IR Receiver**, plus the backlight, decoded identity sensors and local lamp controls.
 
 ## Display and remote capture
 
 ![T-Embed CC1101 Plus showing candidate remote ID 0xC6FB, XOR key 0x58 and command 0x51](image.png)
 
-The photo shows a configuration with additional recording/status lines. The supplied example displays **RF control: ON/OFF** and does not implement the photo's **No recording (RAW)** or **Saved: 0 timings** features.
+The photo includes recording features that are not in this example. The example shows **RF control: ON/OFF**, without the **No recording (RAW)** or **Saved: 0 timings** lines.
 
 After boot, the example displays **Waiting for RF decode**. Press a button on your original lamp remote, then read:
 
@@ -45,13 +45,13 @@ After boot, the example displays **Waiting for RF decode**. Press a button on yo
 | `Age` | Seconds since the latest candidate frame, not lamp status |
 | `RF control` | State of the switch guarding the optional local lamp buttons |
 
-The photo's values are examples, not universal lamp settings. Press several different remote buttons and check that the ID/key pair stays consistent while the command changes. Candidates also appear in the ESPHome logs at INFO level:
+The photo's values are examples, not settings for every lamp. Press several different remote buttons and check that the ID/key pair stays the same while the command changes. Candidates also appear in the ESPHome logs at INFO level:
 
 ```text
 Candidate frame=0xC6FB5109 remote_id=0xC6FB xor_key=0x58 command=0x51
 ```
 
-The decoder checks pulse timing and known command bytes; it does not authenticate the remote or confirm a lamp response. The latest candidate replaces the displayed identity, so nearby compatible remotes can change it. Candidate values and frame counts reset on reboot. Capturing an identity never changes the configured transmit identity.
+The decoder checks pulse timing and known command bytes, but does not authenticate the remote or confirm a lamp response. Each candidate replaces the displayed identity, so nearby compatible remotes can change it. Candidate values and frame counts reset on reboot. They never change the identity used to transmit commands.
 
 ## Home Assistant integration
 
@@ -61,13 +61,13 @@ Integration buttons use the identity entered in Home Assistant. They do not use 
 
 ## Optional local lamp buttons
 
-The ESPHome device separately exposes **Power toggle**, **Brightness cycle**, **Color temperature cycle**, **Reading mode**, **Night light** and **Timer**. To use them:
+ESPHome provides its own **Power toggle**, **Brightness cycle**, **Color temperature cycle**, **Reading mode**, **Night light** and **Timer** buttons, separate from the integration's buttons. To use them:
 
 1. Set the YAML's `remote_id` and `xor_key` substitutions to your captured values, keeping them quoted, then compile and flash again. A zero remote ID blocks these buttons; a zero XOR key is allowed.
 2. If your remote reverses Night light and Timer, exchange `cmd_night_light` and `cmd_timer`. The Home Assistant integration has its own independent swap setting.
 3. Turn on **Allow RF control** in Home Assistant, then press a local lamp button. The switch resets to off on every boot.
 
-These buttons send eight total copies of the command and do not report confirmed lamp state. **Allow RF control guards only these local lamp buttons. It does not block RF or IR proxy transmissions.** No lamp command is sent at boot.
+These buttons send eight copies of each command and do not report lamp state. **Allow RF control** only blocks these local lamp buttons, not RF or IR proxy transmissions. No lamp command is sent at boot.
 
 ## Hardware mapping
 
@@ -81,7 +81,7 @@ These buttons send eight total copies of the command and do not report confirmed
 | Inactive peripherals | SD CS 13 high, nRF CS 44 high, nRF CE 43 low |
 | Infrared | RX 1, TX 2 |
 
-The transmitter enters CC1101 TX mode before sending and returns to RX on completion. Keep these callbacks when adapting the YAML. The proxy's frequency metadata alone does not configure the hardware; the `cc1101` component sets frequency and modulation.
+The transmitter enters CC1101 TX mode before sending and returns to RX when finished. Keep these callbacks if you change the YAML. The `cc1101` component sets the radio's frequency and modulation; the proxy's frequency metadata does not configure the hardware.
 
 ## Troubleshooting
 
