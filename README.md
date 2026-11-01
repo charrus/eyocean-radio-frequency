@@ -30,7 +30,21 @@ The lamp has no feedback channel and the known commands are toggles/cycles. This
 
 This integration does not scan frequencies, pair a lamp, capture RF, or send a test transmission during setup. Current stable HA 2026.10.4 exposes transmitter consumers but not the receiver-consumer API present on the upstream development branch. Learn identity values using ESPHome's existing decoder/logs or a separate capture tool, then enter them in setup.
 
-## Install manually
+## Installation
+
+### Install with HACS (recommended)
+
+Install [HACS](https://hacs.xyz/) first, then click the button below to open this integration's repository in your Home Assistant instance:
+
+[![Open marketplace repository in HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=charrus&repository=eyocean-radio-frequency&category=integration)
+
+1. Download **EYOCEAN RF Desk Lamp** in HACS. Enable prerelease versions if the initial release is not listed.
+2. Restart Home Assistant.
+3. Continue to [Configuration](#configuration) below to add your lamp.
+
+The button requires [My Home Assistant](https://my.home-assistant.io/) configured with your instance's URL. If you prefer to add the repository manually, go to **HACS → Custom repositories**, add `https://github.com/charrus/eyocean-radio-frequency` with type **Integration**, then download it and restart Home Assistant. This integration is not included in the default HACS catalog.
+
+### Install manually
 
 1. Back up your Home Assistant configuration. If you already have a custom `eyocean` integration, back it up rather than overwrite it blindly.
 2. Copy the **entire** `custom_components/eyocean` directory into your Home Assistant configuration directory:
@@ -50,18 +64,21 @@ This integration does not scan frequencies, pair a lamp, capture RF, or send a t
 
    The release ZIP contains the `custom_components/eyocean/` layout and README. Extract it into the HA configuration directory, not inside another `eyocean` subdirectory. The project root's `custom_components/__init__.py` is a test-discovery helper and is not included in the ZIP.
 3. Restart Home Assistant **when you are ready**. Creating this project does not install or restart anything.
-4. Go to **Settings → Devices & services → Add integration → EYOCEAN RF Desk Lamp**.
-5. Choose the existing compatible RF transmitter. Enter a lamp name, remote ID, XOR key, repeat count and optional Night/Timer swap.
+4. Continue to [Configuration](#configuration) below to add your lamp.
+
+## Configuration
+
+After installing the integration and restarting Home Assistant, click **Add integration** below to start setup. This shortcut also requires My Home Assistant configured with your instance's URL.
+
+[![Add integration to your Home Assistant instance.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=eyocean)
+
+Alternatively, go to **Settings → Devices & services → Add integration → EYOCEAN RF Desk Lamp**.
+
+Choose the existing compatible RF transmitter. Enter a lamp name, remote ID, XOR key, repeat count and optional Night/Timer swap. Have the values listed under [Prerequisites](#prerequisites) ready; installation does not configure your transmitter or capture your remote identity for you.
 
 ID fields accept one to four / one to two hexadecimal digits, with optional `0x` prefix. The remote ID cannot be zero; the XOR key can. Do not paste a full 32-bit frame into the remote-ID field. Setup refuses duplicate ID/key pairs, even across different adapters, because the pair identifies the same RF remote command group.
 
 The UI stores a stable transmitter registry reference, so normal entity renaming does not break the integration. Use the integration entry's **Reconfigure** menu to change adapter, identity, name, repeats or Night/Timer assignment. Reconfiguration itself sends no RF commands. A missing transmitter registry entry requires reconfiguration; an offline adapter leaves buttons unavailable until it returns.
-
-## Install with HACS as a custom repository
-
-This integration is published at [charrus/eyocean-radio-frequency](https://github.com/charrus/eyocean-radio-frequency). It is not included in the default HACS catalog.
-
-In **HACS → Custom repositories**, add `https://github.com/charrus/eyocean-radio-frequency` with type **Integration**, then download it. Enable prerelease versions if the initial release is not listed. Restart Home Assistant and follow the setup steps above. HACS installation does not configure your transmitter or remote identity for you.
 
 The project is licensed under **MIT**; see [LICENSE](LICENSE). Upstream protocol attribution and its MIT notice are retained separately in `custom_components/eyocean/UPSTREAM_LICENSE.txt`.
 
