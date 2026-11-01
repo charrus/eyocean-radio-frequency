@@ -1,6 +1,6 @@
 # LILYGO T-Embed CC1101 Plus
 
-Use the built-in CC1101 as a 433.92 MHz ASK/OOK RF proxy for Home Assistant. The [ESPHome configuration](t-embed-cc1101-plus.yaml) displays candidate EYOCEAN remote IDs and XOR keys, provides an IR proxy through the built-in transmitter and receiver, and includes six optional local lamp buttons.
+The [ESPHome configuration](t-embed-cc1101-plus.yaml) uses the built-in CC1101 as a 433.92 MHz ASK/OOK RF proxy for Home Assistant. It displays candidate EYOCEAN remote IDs and XOR keys. The built-in IR transmitter and receiver provide a separate IR proxy, and six optional local buttons send lamp commands.
 
 This example uses the **T-Embed CC1101 Plus** pinout, not the original T-Embed pinout. Check your board revision before flashing. SD and nRF24L01 stay inactive. NFC, charger control, rotary controls and raw recording/replay are not configured.
 
@@ -8,7 +8,7 @@ This example uses the **T-Embed CC1101 Plus** pinout, not the original T-Embed p
 
 1. Copy [t-embed-cc1101-plus.yaml](t-embed-cc1101-plus.yaml) into your ESPHome configuration directory. It requires ESPHome **2026.10.1** or later.
 2. Set `name` and `friendly_name`. Leave `remote_id` and `xor_key` at zero if you only want to capture a remote or use the Home Assistant integration.
-3. Add these entries to your private `secrets.yaml` alongside the copied configuration:
+3. Add these entries to your private `secrets.yaml` beside the copied configuration:
 
    ```yaml
    api_key: "<device-specific base64 API encryption key>"
@@ -32,9 +32,9 @@ This example uses the **T-Embed CC1101 Plus** pinout, not the original T-Embed p
 
 ![T-Embed CC1101 Plus showing candidate remote ID 0xC6FB, XOR key 0x58 and command 0x51](image.png)
 
-The photo includes recording features that are not in this example. The example shows **RF control: ON/OFF**, without the **No recording (RAW)** or **Saved: 0 timings** lines.
+The example shows **RF control: ON/OFF**. The photo's **No recording (RAW)** and **Saved: 0 timings** lines come from a configuration with recording features that are not included here.
 
-After boot, the example displays **Waiting for RF decode**. Press a button on your original lamp remote, then read:
+At boot, the display shows **Waiting for RF decode**. Press a button on your original lamp remote to see:
 
 | Display field | Meaning |
 |---|---|
@@ -45,7 +45,7 @@ After boot, the example displays **Waiting for RF decode**. Press a button on yo
 | `Age` | Seconds since the latest candidate frame, not lamp status |
 | `RF control` | State of the switch guarding the optional local lamp buttons |
 
-The photo's values are examples, not settings for every lamp. Press several different remote buttons and check that the ID/key pair stays the same while the command changes. Candidates also appear in the ESPHome logs at INFO level:
+Do not use the photo's values as defaults for your lamp. Press several different remote buttons and check that the ID/key pair stays the same while the command changes. Candidates also appear in the ESPHome logs at INFO level:
 
 ```text
 Candidate frame=0xC6FB5109 remote_id=0xC6FB xor_key=0x58 command=0x51
@@ -55,19 +55,19 @@ The decoder checks pulse timing and known command bytes, but does not authentica
 
 ## Home Assistant integration
 
-Add **EYOCEAN RF Desk Lamp**, select this device's **433MHz RF Transmitter**, and enter the remote ID and XOR key captured from your own remote. Follow the [integration configuration instructions](../README.md#configuration). Do not enter the full 32-bit `frame` as the remote ID.
+Follow the [integration configuration instructions](../README.md#configuration) to add **EYOCEAN RF Desk Lamp**. Select this device's **433MHz RF Transmitter** and enter the remote ID and XOR key captured from your remote. Do not use the full 32-bit `frame` as the remote ID.
 
-Integration buttons use the identity entered in Home Assistant. They do not use the YAML's `remote_id` and `xor_key` substitutions and do not require **Allow RF control** to be on.
+Integration buttons use the identity entered in Home Assistant, not the YAML's `remote_id` and `xor_key` substitutions. The **Allow RF control** switch does not block them.
 
 ## Optional local lamp buttons
 
-ESPHome provides its own **Power toggle**, **Brightness cycle**, **Color temperature cycle**, **Reading mode**, **Night light** and **Timer** buttons, separate from the integration's buttons. To use them:
+ESPHome also provides **Power toggle**, **Brightness cycle**, **Color temperature cycle**, **Reading mode**, **Night light** and **Timer** buttons. These are separate from the integration's buttons. To use them:
 
 1. Set the YAML's `remote_id` and `xor_key` substitutions to your captured values, keeping them quoted, then compile and flash again. A zero remote ID blocks these buttons; a zero XOR key is allowed.
-2. If your remote reverses Night light and Timer, exchange `cmd_night_light` and `cmd_timer`. The Home Assistant integration has its own independent swap setting.
+2. If your remote reverses Night light and Timer, exchange `cmd_night_light` and `cmd_timer`. This does not change the Home Assistant integration's separate swap setting.
 3. Turn on **Allow RF control** in Home Assistant, then press a local lamp button. The switch resets to off on every boot.
 
-These buttons send eight copies of each command and do not report lamp state. **Allow RF control** only blocks these local lamp buttons, not RF or IR proxy transmissions. No lamp command is sent at boot.
+These buttons send eight copies of each command and do not report lamp state. Turning off **Allow RF control** blocks only these buttons, not RF or IR proxy transmissions. No lamp command is sent at boot.
 
 ## Hardware mapping
 
@@ -87,6 +87,6 @@ The transmitter enters CC1101 TX mode before sending and returns to RX when fini
 
 - **No candidate:** check the 433 MHz antenna connection, board revision and remote compatibility. Set `logger.level: DEBUG` to inspect raw pulse dumps; candidate messages use INFO.
 - **Local button blocked:** configure a nonzero remote ID and turn on **Allow RF control** after boot. This does not affect integration buttons using the proxy.
-- **Lamp does not react:** verify the captured ID/key pair, antenna path and command mapping. Successful transmission requests do not confirm a lamp response.
+- **Lamp does not respond:** check the captured ID/key pair, antenna path and command mapping. A successful transmission request does not mean the lamp received it.
 - **Blank display or boot problems:** verify the Plus pinout and configured flash/PSRAM settings. Review build and device logs before changing pins.
 - **Transmitter missing in setup:** confirm the ESPHome device is connected and exposes its RF transmitter, then check the [integration prerequisites](../README.md#prerequisites).
