@@ -9,7 +9,7 @@ import re
 from rf_protocols import ModulationType, RadioFrequencyCommand
 
 FREQUENCY = 433_920_000
-COMMANDS = frozenset((0x51, 0x5B, 0x5A, 0x49, 0x4D, 0x41))
+COMMANDS = frozenset((0x51, 0x5B, 0x5A, 0x49, 0x41, 0x4D))
 
 
 def parse_hex(value: str, digits: int) -> int:
