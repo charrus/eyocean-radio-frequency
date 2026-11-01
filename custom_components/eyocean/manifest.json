@@ -1,0 +1,15 @@
+{
+  "domain": "eyocean",
+  "name": "EYOCEAN RF Desk Lamp",
+  "version": "0.1.0",
+  "config_flow": true,
+  "dependencies": [
+    "radio_frequency"
+  ],
+  "documentation": "https://github.com/charrus/eyocean-radio-frequency",
+  "issue_tracker": "https://github.com/charrus/eyocean-radio-frequency/issues",
+  "integration_type": "device",
+  "iot_class": "assumed_state",
+  "codeowners": ["@charrus"],
+  "requirements": []
+}

@@ -1,0 +1,43 @@
+{
+  "title": "EYOCEAN RF Desk Lamp",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Set up an EYOCEAN RF desk lamp",
+        "description": "Choose an existing 433.92 MHz OOK transmitter and enter the identity decoded from your own remote. Setup never transmits. This integration provides command buttons, not confirmed lamp state.",
+        "data": {
+          "name": "Lamp name",
+          "transmitter": "433.92 MHz RF transmitter",
+          "remote_id": "Remote ID (1–4 hex digits, optional 0x prefix)",
+          "xor_key": "XOR key (1–2 hex digits, optional 0x prefix)",
+          "repeats": "Total transmissions per button press",
+          "swap_night_timer": "Swap Night light and Timer command codes"
+        }
+      },
+      "reconfigure": {
+        "title": "Reconfigure EYOCEAN lamp",
+        "description": "Change the transmitter, remote identity or command repetition. No test transmission is sent.",
+        "data": {
+          "name": "Lamp name",
+          "transmitter": "433.92 MHz RF transmitter",
+          "remote_id": "Remote ID (1–4 hex digits, optional 0x prefix)",
+          "xor_key": "XOR key (1–2 hex digits, optional 0x prefix)",
+          "repeats": "Total transmissions per button press",
+          "swap_night_timer": "Swap Night light and Timer command codes"
+        }
+      }
+    },
+    "error": {
+      "invalid_remote_id": "Enter a nonzero remote ID with at most four hexadecimal digits.",
+      "invalid_xor_key": "Enter an XOR key with at most two hexadecimal digits. Zero is valid.",
+      "invalid_repeats": "Enter a whole number from 1 to 20.",
+      "invalid_transmitter": "Select an available compatible RF transmitter from the list.",
+      "invalid_name": "Enter a lamp name."
+    },
+    "abort": {
+      "no_compatible_transmitters": "No compatible 433.92 MHz OOK transmitter is registered. Add an RF adapter such as an ESPHome radio_frequency proxy first.",
+      "already_configured": "This remote ID and XOR key are already configured.",
+      "reconfigure_successful": "The EYOCEAN lamp configuration has been updated."
+    }
+  }
+}
