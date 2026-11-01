@@ -153,3 +153,21 @@ Published frame structure:
 A frame begins `+250, -6250` microseconds, then 32 bits MSB-first: zero=`+250,-750`, one=`+750,-250`. The default is **eight total transmissions**. `rf_protocols.repeat_count` counts additional transmissions, so this integration sets it to **seven**, not eight. The native ESPHome adapter adds one when passing the total to its API.
 
 Repeat count is configurable from 1 to 20. Button requests from all EYOCEAN entries sharing a transmitter registry UUID are sent one at a time, spaced by the encoded burst airtime. Unused transmitter locks are released on unload. This scheduling does not confirm reception or coordinate with unrelated integrations using the same adapter. Observe RF duty-cycle limits and local regulations. The integration does not automatically replay commands or send them at boot or during setup.
+
+## Development
+
+Install [uv](https://docs.astral.sh/uv/getting-started/installation/), then run these commands from the repository root. uv manages `.venv` and the Python version pinned in `.python-version` (3.14.4). Home Assistant requires at least Python 3.14.2; this project supports the 3.14 series.
+
+```sh
+uv sync --locked
+uv run --locked prek install
+uv run --locked python -m pytest -q
+uv run --locked ruff check .
+uv run --locked ruff format --check custom_components tests scripts
+uv run --locked prek run --all-files
+uv run --locked python scripts/package.py
+```
+
+Development dependencies live in `pyproject.toml` under `[dependency-groups].dev`, with resolved versions in `uv.lock`. Use `uv add --dev <package>` to add tools and commit both files. Do not mix pip installs into this workflow. The pre-commit hooks check the lockfile, Ruff lint and formatting using the project environment; CI runs the same checks plus tests and packaging.
+
+The integration is installed through Home Assistant, not as a Python package. The packaging script builds and verifies `dist/eyocean-radio-frequency-<version>.zip` using the integration manifest's version. Tests use an in-memory RF transmitter and do not verify physical radio timing or lamp response.

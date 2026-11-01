@@ -5,22 +5,25 @@ Home Assistant custom integration (`eyocean`) for 433.92 MHz ASK/OOK desk lamps.
 ## Dev environment
 
 - Use https://pydevtools.com/handbook/explanation/modern-python-project-setup-guide-for-ai-assistants.md as the authoritative playbook for Python.
-- Use Python **3.14**, matching `.github/workflows/ci.yml` and Ruff's `py314` target. The code uses Python 3.14 exception syntax.
-- In your Python 3.14 environment, install the pinned dependencies from the repository root:
+- Use Python **3.14.4**, pinned in `.python-version`; `requires-python` allows 3.14.2–3.14.x to satisfy Home Assistant. The code uses Python 3.14 exception syntax.
+- Use uv (CI pins 0.13.6) from the repository root; it manages `.venv` and installs the locked development dependencies:
   ```sh
-  python -m pip install -r requirements-dev.txt
+  uv sync --locked
+  uv run --locked prek install
   ```
-- Pins: Home Assistant 2026.10.4, rf-protocols 4.3.0, pytest-homeassistant-custom-component 0.13.375, Ruff 0.17.3. `pyproject.toml` contains tool settings, not an installable project definition.
+- Declare development dependencies in `pyproject.toml` under `[dependency-groups].dev`; commit `uv.lock`. Use `uv add --dev` for changes, not pip or a separate requirements file.
+- Home Assistant, rf-protocols, the HA pytest plugin and Ruff retain their exact pins. `[tool.uv] package = false` keeps this HA custom integration out of Python package installation; `scripts/package.py` remains the release builder.
 
 ## Build and checks
 
-Run the exact CI commands from the repository root, with the development environment active:
+Run the exact CI commands from the repository root; no manual environment activation is needed:
 
 ```sh
-python -m pytest -q
-ruff check .
-ruff format --check custom_components tests scripts
-python scripts/package.py
+uv run --locked python -m pytest -q
+uv run --locked ruff check .
+uv run --locked ruff format --check custom_components tests scripts
+uv run --locked prek run --all-files
+uv run --locked python scripts/package.py
 ```
 
 - Pytest discovers `tests/`; asyncio mode is `auto`, with function-scoped fixture loops.
@@ -53,7 +56,7 @@ python scripts/package.py
 ## ESPHome examples
 
 - For ESP32 configurations, use `variant`, never `board`. Set flash size, PSRAM and hardware pins explicitly rather than relying on board presets.
-- Start with `examples/README.md` and the hardware-specific guide. Examples require ESPHome 2026.10.1 or later; it is not installed by `requirements-dev.txt` or checked by the Python CI workflow.
+- Start with `examples/README.md` and the hardware-specific guide. Examples require ESPHome 2026.10.1 or later; it is not in the uv development dependencies or checked by the Python CI workflow.
 - `m5stack-atom-lite.yaml` targets the original ESP32 ATOM Lite with external RF TX/RX on GPIO25/GPIO19, not the ATOM S3 Lite.
 - `t-embed-cc1101-plus.yaml` uses `variant: ESP32S3`, 16MB flash and octal PSRAM. Preserve Plus-specific pins, startup chip-select/power ordering, antenna routing and CC1101 TX/RX callbacks.
 - Both examples use private `secrets.yaml` entries `api_key`, `wifi_ssid`, and `wifi_password`. Generate a device-specific key with `openssl rand -base64 32`; never copy credentials into tracked YAML.
