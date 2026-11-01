@@ -74,6 +74,8 @@ After installing the integration and restarting Home Assistant, click **Add inte
 
 Alternatively, go to **Settings → Devices & services → Add integration → EYOCEAN RF Desk Lamp**.
 
+![alt text](image-1.png)
+
 Choose the existing compatible RF transmitter. Enter a lamp name, remote ID, XOR key, repeat count and optional Night/Timer swap. Have the values listed under [Prerequisites](#prerequisites) ready; installation does not configure your transmitter or capture your remote identity for you.
 
 ID fields accept one to four / one to two hexadecimal digits, with optional `0x` prefix. The remote ID cannot be zero; the XOR key can. Do not paste a full 32-bit frame into the remote-ID field. Setup refuses duplicate ID/key pairs, even across different adapters, because the pair identifies the same RF remote command group.
