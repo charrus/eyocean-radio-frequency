@@ -1,0 +1,367 @@
+# LILYGO T-Embed CC1101 Plus: CC1101 RF proxy, IR proxy and decode display.
+# Sanitized from lounge-desk-lamp.yaml; this is not the original T-Embed pinout.
+# The nRF24L01 and SD card are kept inactive; no NFC/charger driver is configured.
+substitutions:
+  name: t-embed-cc1101-plus
+  friendly_name: T-Embed CC1101 Plus
+  # Set these from your own remote to use the optional local lamp buttons.
+  # Home Assistant integration buttons use the identity entered in HA instead.
+  remote_id: "0x0000"
+  xor_key: "0x00"
+  cmd_night_light: "0x41"
+  cmd_timer: "0x4D"
+
+esphome:
+  name: ${name}
+  friendly_name: ${friendly_name}
+  min_version: 2026.10.1
+  comment: CC1101 RF and IR proxy with EYOCEAN candidate decoding
+  on_boot:
+    priority: 1050
+    then:
+      - output.turn_on: lcd_cs
+      - output.turn_on: sd_cs
+      - output.turn_on: nrf_cs
+      - output.turn_off: nrf_ce
+      - output.turn_on: antenna_sw1
+      - output.turn_on: antenna_sw0
+      - output.turn_on: power_enable
+      - lambda: delay(10);
+
+esp32:
+  board: esp32-s3-devkitc-1
+  flash_size: 16MB
+  framework:
+    type: esp-idf
+    advanced:
+      flash_chip: generic
+
+logger:
+  hardware_uart: USB_SERIAL_JTAG
+  level: INFO
+
+api:
+  encryption:
+    key: !secret api_key
+
+ota:
+  - platform: esphome
+    encryption:
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+output:
+  - platform: gpio
+    id: lcd_cs
+    pin:
+      number: GPIO41
+      allow_other_uses: true
+    setup_priority: 1100
+  - platform: gpio
+    id: sd_cs
+    pin: GPIO13
+    setup_priority: 1100
+  - platform: gpio
+    id: nrf_cs
+    pin: GPIO44
+    setup_priority: 1100
+  - platform: gpio
+    id: nrf_ce
+    pin: GPIO43
+    setup_priority: 1100
+  - platform: gpio
+    id: antenna_sw1
+    pin: GPIO47
+    setup_priority: 1100
+  - platform: gpio
+    id: antenna_sw0
+    pin: GPIO48
+    setup_priority: 1100
+  - platform: gpio
+    id: power_enable
+    pin: GPIO15
+    setup_priority: 1100
+  - platform: gpio
+    id: lcd_backlight
+    pin: GPIO21
+
+light:
+  - platform: binary
+    id: screen_backlight
+    name: Screen backlight
+    output: lcd_backlight
+    restore_mode: ALWAYS_ON
+
+psram:
+  mode: octal
+  speed: 80MHz
+
+spi:
+  clk_pin: GPIO11
+  mosi_pin: GPIO9
+  miso_pin: GPIO10
+
+cc1101:
+  id: radio
+  cs_pin: GPIO12
+  frequency: 433.92MHz
+  modulation_type: ASK/OOK
+  symbol_rate: 40000
+  output_power: 0
+
+remote_receiver:
+  - id: rf_rx
+    pin: GPIO38
+    rmt_symbols: 96
+    filter: 50us
+    idle: 10ms
+    buffer_size: 8kb
+    dump: raw
+    on_raw:
+      then:
+        - lambda: |-
+            for (size_t start = 0; start + 63 < x.size(); ++start) {
+              if (start != 0 && x[start - 1] > -4000) continue;
+              uint32_t code = 0;
+              bool valid = true;
+              for (size_t bit = 0; bit < 32; ++bit) {
+                int32_t high = x[start + bit * 2];
+                int32_t low = -x[start + bit * 2 + 1];
+                bool zero = high >= 125 && high <= 400 && low >= 500 && low <= 1000;
+                bool one = high >= 500 && high <= 1000 && low >= 125 && low <= 400;
+                if (!zero && !one) { valid = false; break; }
+                code = (code << 1) | (one ? 1U : 0U);
+              }
+              unsigned command = (code >> 8) & 0xFF;
+              bool known = command == 0x51 || command == 0x5B || command == 0x5A || command == 0x49 || command == 0x41 || command == 0x4D;
+              if (valid && known) {
+                id(decoded_remote_id) = code >> 16;
+                id(decoded_xor_key) = command ^ (code & 0xFF);
+                id(decoded_command) = command;
+                id(decoded_count)++;
+                id(decoded_ms) = millis();
+                id(has_decoded) = true;
+                ESP_LOGI("eyocean", "Candidate frame=0x%08X remote_id=0x%04X xor_key=0x%02X command=0x%02X",
+                         (unsigned) code, (unsigned)(code >> 16), command ^ (unsigned)(code & 0xFF), command);
+                break;
+              }
+            }
+  - id: ir_rx
+    pin:
+      number: GPIO1
+      inverted: true
+      mode:
+        input: true
+        pullup: true
+    rmt_symbols: 96
+    filter: 50us
+    idle: 10ms
+    dump: all
+
+remote_transmitter:
+  - id: rf_tx
+    pin: GPIO3
+    carrier_duty_percent: 100%
+    rmt_symbols: 96
+    non_blocking: true
+    on_transmit:
+      - cc1101.begin_tx: radio
+    on_complete:
+      - cc1101.begin_rx: radio
+  - id: ir_tx
+    pin: GPIO2
+    carrier_duty_percent: 50%
+    rmt_symbols: 96
+    non_blocking: true
+
+# This switch guards only send_command, NOT the RF or IR proxy endpoints.
+switch:
+  - platform: template
+    id: tx_enabled
+    name: Allow RF control
+    entity_category: config
+    optimistic: true
+    restore_mode: ALWAYS_OFF
+
+globals:
+  - id: has_decoded
+    type: bool
+    restore_value: false
+    initial_value: 'false'
+  - id: decoded_remote_id
+    type: uint16_t
+    restore_value: false
+    initial_value: '0'
+  - id: decoded_xor_key
+    type: uint8_t
+    restore_value: false
+    initial_value: '0'
+  - id: decoded_command
+    type: uint8_t
+    restore_value: false
+    initial_value: '0'
+  - id: decoded_count
+    type: uint32_t
+    restore_value: false
+    initial_value: '0'
+  - id: decoded_ms
+    type: uint32_t
+    restore_value: false
+    initial_value: '0'
+
+text_sensor:
+  - platform: template
+    name: Decoded remote ID
+    update_interval: 1s
+    lambda: |-
+      if (!id(has_decoded)) return {"Waiting"};
+      return {str_sprintf("0x%04X", (unsigned)id(decoded_remote_id))};
+  - platform: template
+    name: Decoded XOR key
+    update_interval: 1s
+    lambda: |-
+      if (!id(has_decoded)) return {"Waiting"};
+      return {str_sprintf("0x%02X", (unsigned)id(decoded_xor_key))};
+
+script:
+  - id: send_command
+    mode: single
+    parameters:
+      command: int
+    then:
+      - if:
+          condition:
+            lambda: return id(tx_enabled).state && ${remote_id} != 0;
+          then:
+            - remote_transmitter.transmit_raw:
+                transmitter_id: rf_tx
+                code: !lambda |-
+                  const uint8_t cmd = command & 0xFF;
+                  const uint32_t code = (uint32_t(${remote_id}) << 16) | (uint32_t(cmd) << 8) | (cmd ^ ${xor_key});
+                  std::vector<int32_t> raw{250, -6250};
+                  for (int bit = 31; bit >= 0; --bit) {
+                    const bool one = (code >> bit) & 1U;
+                    raw.push_back(one ? 750 : 250);
+                    raw.push_back(one ? -250 : -750);
+                  }
+                  return raw;
+                repeat:
+                  times: 8
+                  wait_time: 0us
+          else:
+            - logger.log:
+                level: WARN
+                format: "RF blocked: configure your remote ID and enable Allow RF control."
+
+button:
+  - platform: template
+    name: Power toggle
+    on_press:
+      - script.execute:
+          id: send_command
+          command: 0x51
+  - platform: template
+    name: Brightness cycle
+    on_press:
+      - script.execute:
+          id: send_command
+          command: 0x5B
+  - platform: template
+    name: Color temperature cycle
+    on_press:
+      - script.execute:
+          id: send_command
+          command: 0x5A
+  - platform: template
+    name: Reading mode
+    on_press:
+      - script.execute:
+          id: send_command
+          command: 0x49
+  - platform: template
+    name: Night light
+    on_press:
+      - script.execute:
+          id: send_command
+          command: ${cmd_night_light}
+  - platform: template
+    name: Timer
+    on_press:
+      - script.execute:
+          id: send_command
+          command: ${cmd_timer}
+  - platform: restart
+    name: Restart
+    entity_category: diagnostic
+
+binary_sensor:
+  - platform: status
+    name: Online
+
+# Fixed 433.92 MHz CC1101 endpoints for Home Assistant RF connectivity.
+# Proxy TX bypasses the Allow RF control lamp-button guard.
+radio_frequency:
+  - platform: ir_rf_proxy
+    id: rf_proxy_tx
+    name: 433MHz RF Transmitter
+    frequency: 433.92MHz
+    remote_transmitter_id: rf_tx
+  - platform: ir_rf_proxy
+    id: rf_proxy_rx
+    name: 433MHz RF Receiver
+    frequency: 433.92MHz
+    remote_receiver_id: rf_rx
+
+font:
+  - file: "gfonts://Roboto Mono"
+    id: screen_small
+    size: 14
+  - file: "gfonts://Roboto Mono"
+    id: screen_large
+    size: 20
+
+display:
+  - platform: mipi_spi
+    id: lcd
+    model: ST7789V
+    cs_pin:
+      number: GPIO41
+      allow_other_uses: true
+    dc_pin: GPIO16
+    dimensions:
+      width: 170
+      height: 320
+      offset_width: 35
+      offset_height: 0
+    rotation: 270
+    invert_colors: true
+    color_order: RGB
+    data_rate: 20MHz
+    update_interval: 1s
+    lambda: |-
+      it.fill(Color(0, 0, 0));
+      it.print(6, 2, id(screen_small), Color(70, 200, 255), "EYOCEAN | 433.92 MHz");
+      if (id(has_decoded)) {
+        it.printf(6, 25, id(screen_large), Color(255, 255, 255), "remote_id: 0x%04X", (unsigned)id(decoded_remote_id));
+        it.printf(6, 50, id(screen_large), Color(255, 255, 255), "xor_key:   0x%02X", (unsigned)id(decoded_xor_key));
+        it.printf(6, 78, id(screen_small), Color(255, 200, 80), "Candidate cmd: 0x%02X", (unsigned)id(decoded_command));
+        it.printf(6, 99, id(screen_small), Color(160, 160, 160), "Frames: %u  Age: %us", (unsigned)id(decoded_count), (unsigned)((millis() - id(decoded_ms)) / 1000));
+      } else {
+        it.print(6, 30, id(screen_large), Color(255, 255, 255), "Waiting for RF decode");
+        it.print(6, 62, id(screen_small), Color(160, 160, 160), "Press an original lamp remote");
+        it.print(6, 85, id(screen_small), Color(255, 200, 80), "No decoded identity yet");
+      }
+      it.printf(6, 146, id(screen_small), Color(160, 160, 160), "RF control: %s", id(tx_enabled).state ? "ON" : "OFF");
+
+# Built-in IR hardware, independent of the CC1101 RF front-end.
+infrared:
+  - platform: ir_rf_proxy
+    id: ir_proxy_tx
+    name: IR Transmitter
+    remote_transmitter_id: ir_tx
+  - platform: ir_rf_proxy
+    id: ir_proxy_rx
+    name: IR Receiver
+    remote_receiver_id: ir_rx

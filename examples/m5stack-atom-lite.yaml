@@ -1,0 +1,119 @@
+# M5Stack ATOM Lite with an external fixed-frequency 433.92 MHz OOK radio.
+# TX data: GPIO25; RX data: GPIO19. These are not built-in RF peripherals.
+# Verify your module's wiring, supply voltage and ESP32-safe logic levels.
+substitutions:
+  name: m5stack-atom-lite
+  friendly_name: M5Stack Atom Lite
+
+esphome:
+  name: ${name}
+  friendly_name: ${friendly_name}
+  min_version: 2026.10.1
+
+esp32:
+  variant: esp32
+  flash_size: 4MB
+  framework:
+    type: esp-idf
+
+logger:
+
+api:
+  encryption:
+    key: !secret api_key
+
+ota:
+  - platform: esphome
+    encryption:
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+# The ATOM Lite has one RGB LED on GPIO27, not the ATOM S3 Lite pinout.
+light:
+  - platform: esp32_rmt_led_strip
+    channel_colors: GRB
+    pin: GPIO27
+    num_leds: 1
+    chipset: SK6812
+    id: led
+    name: "${friendly_name} LED"
+    restore_mode: RESTORE_DEFAULT_OFF
+    effects:
+      - pulse:
+          name: Pulse
+          transition_length: 1s
+          update_interval: 1s
+      - strobe:
+          name: Strobe
+      - random:
+          name: Random
+          transition_length: 5s
+          update_interval: 3s
+
+remote_transmitter:
+  id: rf_tx
+  pin: GPIO25
+  carrier_duty_percent: 100%
+
+radio_frequency:
+  - platform: ir_rf_proxy
+    id: rf_proxy_tx
+    name: 433MHz RF Transmitter
+    frequency: 433.92MHz
+    remote_transmitter_id: rf_tx
+  - platform: ir_rf_proxy
+    id: rf_proxy_rx
+    name: 433MHz RF Receiver
+    frequency: 433.92MHz
+    remote_receiver_id: rf_rx
+
+remote_receiver:
+  id: rf_rx
+  pin: GPIO19
+  rmt_symbols: 96
+  filter: 50us
+  idle: 10ms
+  buffer_size: 8kb
+  dump: raw
+  on_raw:
+    then:
+      - lambda: |-
+          for (size_t start = 0; start + 63 < x.size(); ++start) {
+            if (start != 0 && x[start - 1] > -4000) continue;
+            uint32_t code = 0;
+            bool valid = true;
+            for (size_t bit = 0; bit < 32; ++bit) {
+              int32_t high = x[start + bit * 2];
+              int32_t low = -x[start + bit * 2 + 1];
+              bool zero = high >= 125 && high <= 400 && low >= 500 && low <= 1000;
+              bool one = high >= 500 && high <= 1000 && low >= 125 && low <= 400;
+              if (!zero && !one) { valid = false; break; }
+              code = (code << 1) | (one ? 1U : 0U);
+            }
+            unsigned command = (code >> 8) & 0xFF;
+            bool known = command == 0x51 || command == 0x5B || command == 0x5A || command == 0x49 || command == 0x41 || command == 0x4D;
+            if (valid && known) {
+              ESP_LOGI("eyocean", "Candidate frame=0x%08X remote_id=0x%04X xor_key=0x%02X command=0x%02X",
+                       (unsigned) code, (unsigned)(code >> 16), command ^ (unsigned)(code & 0xFF), command);
+              break;
+            }
+          }
+
+button:
+  - platform: restart
+    name: Restart
+    entity_category: diagnostic
+
+binary_sensor:
+  - platform: gpio
+    pin:
+      number: GPIO39
+      mode: INPUT
+      inverted: true
+    name: Atom Button
+    id: atom_button
+    filters:
+      - delayed_on: 50ms
+      - delayed_off: 50ms
