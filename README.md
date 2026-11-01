@@ -111,22 +111,3 @@ Published frame structure:
 A frame begins `+250, -6250` microseconds, then 32 bits MSB-first: zero=`+250,-750`, one=`+750,-250`. The default is **eight total transmissions**. `rf_protocols.repeat_count` counts additional transmissions, so this integration sets it to **seven**, not eight. The native ESPHome adapter adds one when passing the total to its API.
 
 Repeat count is configurable from 1 to 20. Button requests from all EYOCEAN entries sharing a transmitter registry UUID are sent one at a time, spaced by the encoded burst airtime. Unused transmitter locks are released on unload. This scheduling does not confirm reception or coordinate with unrelated integrations using the same adapter. Observe RF duty-cycle limits and local regulations. The integration does not automatically replay commands or send them at boot or during setup.
-
-## Development and checks
-
-Use Python 3.14:
-
-```sh
-python3 -m venv .venv
-.venv/bin/pip install -r requirements-dev.txt
-.venv/bin/python -m pytest -q
-.venv/bin/ruff check custom_components tests
-.venv/bin/ruff format --check custom_components tests
-.venv/bin/python scripts/package.py
-```
-
-Tests run Home Assistant config-entry setup, native RF entities and the native send helper with an in-memory test transmitter. They cover published waveform vectors, validation, UI setup, duplicate prevention, reconfiguration, Night/Timer swapping, adapter availability and renaming, error propagation, unload/reload, and the absence of setup transmissions. They do not verify physical radio timing, range, flash state, lamp compatibility or lamp response.
-
-## Attribution
-
-Protocol timings, frame structure and command mapping are based on [bl4ko/eyocean-ha](https://github.com/bl4ko/eyocean-ha). Its MIT notice is retained in `UPSTREAM_LICENSE.txt`. Native API usage was checked against the locally installed Home Assistant 2026.10.4 source for `radio_frequency`, `esphome.radio_frequency` and `honeywell_string_lights`. Upstream `dev` uses different APIs, so it was not used to establish stable-release compatibility.
