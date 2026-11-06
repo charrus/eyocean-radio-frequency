@@ -6,6 +6,7 @@ from homeassistant.components.button import ButtonEntity, ButtonEntityDescriptio
 from homeassistant.components.radio_frequency import RadioFrequencyTransmitterConsumerEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
@@ -26,7 +27,12 @@ async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddConfigEntryEntitiesCallback
 ) -> None:
     """Create buttons for this lamp's remote identity."""
-    async_add_entities(EyoceanButton(entry, *definition) for definition in COMMAND_BUTTONS)
+    transmitter_entity_id = er.async_validate_entity_id(
+        er.async_get(hass), entry.data[CONF_TRANSMITTER]
+    )
+    async_add_entities(
+        EyoceanButton(entry, transmitter_entity_id, *definition) for definition in COMMAND_BUTTONS
+    )
 
 
 class EyoceanButton(RadioFrequencyTransmitterConsumerEntity, ButtonEntity):
@@ -34,13 +40,24 @@ class EyoceanButton(RadioFrequencyTransmitterConsumerEntity, ButtonEntity):
 
     _attr_has_entity_name = True
 
-    def __init__(self, entry: ConfigEntry, key: str, name: str, command: int, icon: str) -> None:
+    def __init__(
+        self,
+        entry: ConfigEntry,
+        transmitter_entity_id: str,
+        key: str,
+        name: str,
+        command: int,
+        icon: str,
+    ) -> None:
         self.entity_description = ButtonEntityDescription(key=key, name=name, icon=icon)
         self._entry = entry
         self._command = command
         if entry.data.get(CONF_SWAP, False) and key in ("night_light", "timer"):
             self._command = 0x4D if key == "night_light" else 0x41
         self._rf_transmitter_entity_id_or_uuid = entry.data[CONF_TRANSMITTER]
+        # HA 2026.11 requires a resolved entity ID for availability tracking.
+        # Keep the UUID-based attribute for the HA 2026.10 consumer as well.
+        self._rf_transmitter_entity_id = transmitter_entity_id
         self._attr_unique_id = f"{entry.entry_id}_{key}"
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, entry.entry_id)},

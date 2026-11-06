@@ -1,6 +1,6 @@
 [project]
 name = "eyocean-radio-frequency"
-version = "0.1.0"
+version = "0.1.1"
 description = "Home Assistant RF command buttons for EYOCEAN desk lamps"
 readme = "README.md"
 requires-python = ">=3.14.2,<3.15"

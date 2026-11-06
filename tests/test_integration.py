@@ -200,6 +200,39 @@ async def test_raw_service_rejects_invalid_waveform(hass, transmitter, entry):
     assert transmitter.commands == []
 
 
+async def test_consumer_resolves_uuid_for_both_rf_api_versions(hass, transmitter, entry):
+    """The new consumer needs an entity ID, never the stored registry UUID."""
+    from custom_components.eyocean.button import COMMAND_BUTTONS, EyoceanButton
+
+    assert entry.data["transmitter"] != transmitter.entity_id
+    for definition in COMMAND_BUTTONS:
+        button = EyoceanButton(entry, transmitter.entity_id, *definition)
+        assert button._rf_transmitter_entity_id == transmitter.entity_id
+        assert button._rf_transmitter_entity_id_or_uuid == entry.data["transmitter"]
+
+
+async def test_legacy_entity_id_is_normalized_before_rename(hass, transmitter, entry):
+    """Legacy stored IDs must not break the reload used by the HA 2026.11 API."""
+    transmitter_uuid = entry.data["transmitter"]
+    assert await hass.config_entries.async_unload(entry.entry_id)
+    hass.config_entries.async_update_entry(
+        entry, data={**entry.data, "transmitter": transmitter.entity_id}
+    )
+    assert await hass.config_entries.async_setup(entry.entry_id)
+    await hass.async_block_till_done()
+    assert entry.data["transmitter"] == transmitter_uuid
+    registry = er.async_get(hass)
+    for index in range(2):
+        registry.async_update_entity(
+            transmitter.entity_id, new_entity_id=f"radio_frequency.legacy_renamed_{index}"
+        )
+        await hass.async_block_till_done()
+        assert len(hass.states.async_all("button")) == 6
+        assert all(button.state != "unavailable" for button in hass.states.async_all("button"))
+        assert entry.data["transmitter"] == transmitter_uuid
+    assert transmitter.commands == []
+
+
 @pytest.mark.parametrize("use_entity_id", [False, True])
 async def test_entries_sharing_transmitter_wait_for_burst_airtime(
     hass, transmitter, entry, monkeypatch, use_entity_id

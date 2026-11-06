@@ -4,10 +4,11 @@ import asyncio
 from weakref import WeakValueDictionary
 
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import Platform
-from homeassistant.core import HomeAssistant
+from homeassistant.const import ATTR_ENTITY_ID, Platform
+from homeassistant.core import Event, HomeAssistant
 from homeassistant.exceptions import ConfigEntryError
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers.event import async_track_entity_registry_updated_event
 from homeassistant.helpers.typing import ConfigType
 
 from .const import CONF_REMOTE_ID, CONF_REPEATS, CONF_TRANSMITTER, CONF_XOR_KEY, DOMAIN
@@ -42,6 +43,22 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     ):
         raise ConfigEntryError("RF transmitter was removed; reconfigure the EYOCEAN integration")
     registered = er.async_get(hass).async_get(resolved)
+    # Normalize legacy entity-ID references before tracking renames/reloading.
+    if target != registered.id:
+        hass.config_entries.async_update_entry(
+            entry, data={**entry.data, CONF_TRANSMITTER: registered.id}
+        )
+
+    async def async_transmitter_renamed(event: Event[er.EventEntityRegistryUpdatedData]) -> None:
+        # The HA 2026.11 consumer tracks a resolved ID, not registry renames.
+        # Reload once per entry to replace all six availability subscriptions
+        # with the current ID. Setup/reload never sends RF.
+        if event.data["action"] == "update" and ATTR_ENTITY_ID in event.data["changes"]:
+            await hass.config_entries.async_reload(entry.entry_id)
+
+    entry.async_on_unload(
+        async_track_entity_registry_updated_event(hass, resolved, async_transmitter_renamed)
+    )
     # Entry runtime data and in-flight presses own the locks. Weak values discard
     # unused transmitter UUIDs without removing a lock still held by a press.
     locks = hass.data.setdefault(DOMAIN, WeakValueDictionary())

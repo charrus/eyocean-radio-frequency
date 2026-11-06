@@ -2,7 +2,7 @@
 
 Control an EYOCEAN desk lamp with any compatible 433.92 MHz OOK adapter registered in Home Assistant. This custom integration uses the native `radio_frequency` API, without ESPHome service calls or hardcoded GPIOs or IP addresses.
 
-Tested against **Home Assistant Core 2026.10.4 and rf-protocols 4.3.0**. Physical RF transmission and lamp response have not been tested. The native RF APIs are recent, so check compatibility before using another Home Assistant version.
+Tested against **Home Assistant Core 2026.10.4 and 2026.11.0, with rf-protocols 4.3.0**. Version **0.1.1** fixes button setup on HA 2026.11.0. Physical RF transmission and lamp response have not been tested. The native RF APIs are recent, so check compatibility before using another Home Assistant version.
 
 ## What it exposes
 
@@ -23,7 +23,7 @@ The lamp has no feedback channel. Its known commands toggle or cycle settings, s
 
 ## Prerequisites
 
-1. Home Assistant Core **2026.10.4** (the version tested here), with support for the native `radio_frequency` domain.
+1. Home Assistant Core **2026.10.4 or 2026.11.0** (the versions tested here), with support for the native `radio_frequency` domain.
 2. An RF transmitter entity supporting **433.92 MHz ASK/OOK**, such as an ESPHome CC1101 RF proxy. Configure the radio, antenna path and TX/RX switching; declaring the proxy's frequency does not tune the radio.
 3. A compatible EYOCEAN **32-bit fixed-code** remote. Not all EYOCEAN models are known to use this protocol.
 4. The **remote ID** (16 bits) and **XOR key** (8 bits), captured from your original remote. These are separate per-remote values, not lamp-model identifiers.
@@ -67,6 +67,10 @@ The button requires [My Home Assistant](https://my.home-assistant.io/) configure
    If using the release ZIP, extract it into the HA configuration directory, not another `eyocean` subdirectory. It contains the `custom_components/eyocean/` layout and README, but excludes the root `custom_components/__init__.py` test-discovery helper.
 3. Restart Home Assistant.
 4. Add your lamp under [Configuration](#configuration).
+
+## Updating from 0.1.0
+
+If the integration is loaded but its buttons fail with a missing `_rf_transmitter_entity_id` error on HA 2026.11.0, update to **0.1.1** in HACS (enable prereleases if needed), then restart Home Assistant. For a manual installation, replace `custom_components/eyocean/` with the new release's directory and restart. Keep the existing configuration entry: transmitter selection, remote ID/key, entity IDs and automations do not need recreating. No ESPHome reflash is required for this compatibility fix.
 
 ## Capturing `remote_id` and `xor_key`
 
@@ -200,5 +204,13 @@ uv run --locked python scripts/package.py
 ```
 
 Add development tools with `uv add --dev <package>`. This updates `[dependency-groups].dev` in `pyproject.toml` and the resolved versions in `uv.lock`; commit both files. Do not mix pip installs into this workflow. The pre-commit hooks check the lockfile, lint and formatting in the project environment. CI also runs tests and packaging.
+
+The locked pytest environment uses HA 2026.10.4 because its fixture plugin pins that version. CI separately runs `scripts/check_ha_compat.py` against both 2026.10.4 and 2026.11.0 in isolated uv environments without that plugin. This boots real HA core helpers and RF dependencies, verifies all six buttons, native command dispatch, UUID resolution, repeated transmitter renames, availability recovery and unload/reload. It uses only an in-memory transmitter and temporary configuration, never your HA instance or radio hardware. Reproduce either compatibility check with:
+
+```sh
+uv run --no-project --python 3.14.4 --with homeassistant==2026.11.0 --with rf-protocols==4.3.0 python scripts/check_ha_compat.py
+```
+
+Replace `2026.11.0` with `2026.10.4` to check the older RF consumer API. These isolated checks resolve the selected HA version's dependencies separately; they do not change the locked development environment.
 
 Home Assistant installs the integration; it is not a Python package. The packaging script builds and verifies `dist/eyocean-radio-frequency-<version>.zip`, using the version in the integration manifest. Tests use an in-memory RF transmitter, so they cannot verify physical radio timing or lamp response.

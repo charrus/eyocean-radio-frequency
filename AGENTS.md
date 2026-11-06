@@ -50,6 +50,8 @@ uv run --locked python scripts/package.py
 - The remote ID/key pair identifies a remote, regardless of adapter. Store transmitter registry UUIDs so entity renames work.
 - All entries sharing a transmitter UUID share one lock. Preserve burst-airtime spacing: the native send call can return before physical transmission finishes.
 - `tests/conftest.py` redirects `custom_components.__path__` to this checkout; the HA test plugin otherwise supplies a dummy package. Keep the root `custom_components/__init__.py` test-discovery helper out of install artifacts.
+- `tests/test_integration.py` uses the locked HA 2026.10.4 fixture plugin. Run `uv run --no-project --python 3.14.4 --with homeassistant==2026.11.0 --with rf-protocols==4.3.0 python scripts/check_ha_compat.py` for a real, plugin-independent native RF compatibility check; CI runs it for both 2026.10.4 and 2026.11.0. It uses a temporary configuration and an in-memory transmitter, not the live instance. Do not force-install a different HA into the locked fixture environment: the plugin imports version-specific HA internals.
+- Initialize the RF consumer with both its legacy UUID attribute and the resolved entity ID required by HA 2026.11. Keep UUIDs in config entries, and reload the entry on transmitter renames to replace the newer consumer's availability subscriptions.
 - Tests check software behavior, not physical RF timing, lamp compatibility or response. HA 2026.10.4 lacks the receiver-consumer API available on upstream `dev`.
 - Preserve the protocol attribution and `custom_components/eyocean/UPSTREAM_LICENSE.txt` when changing or packaging the integration.
 

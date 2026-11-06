@@ -21,3 +21,23 @@ jobs:
       - run: uv run --locked ruff format --check custom_components tests scripts
       - run: uv run --locked prek run --all-files
       - run: uv run --locked python scripts/package.py
+  rf-compatibility:
+    name: Native RF compatibility (HA ${{ matrix.homeassistant }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        homeassistant: ["2026.10.4", "2026.11.0"]
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: "0.13.6"
+          enable-cache: true
+      # Keep this separate from the older pytest plugin's exact HA dependency.
+      # Exercise real HA bootstrap, entities and services, not mocked RF helpers.
+      - run: >-
+          uv run --no-project --python 3.14.4
+          --with homeassistant==${{ matrix.homeassistant }}
+          --with rf-protocols==4.3.0
+          python scripts/check_ha_compat.py
