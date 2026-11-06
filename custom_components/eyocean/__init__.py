@@ -8,11 +8,19 @@ from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryError
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers.typing import ConfigType
 
 from .const import CONF_REMOTE_ID, CONF_REPEATS, CONF_TRANSMITTER, CONF_XOR_KEY, DOMAIN
 from .protocol import EyoceanCommand
+from .services import async_setup_services
 
 PLATFORMS = [Platform.BUTTON]
+
+
+async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
+    """Register explicit diagnostic actions without sending commands."""
+    async_setup_services(hass)
+    return True
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

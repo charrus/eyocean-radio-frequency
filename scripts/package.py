@@ -12,7 +12,9 @@ COMPONENT = ROOT / "custom_components" / "eyocean"
 def main() -> None:
     version = json.loads((COMPONENT / "manifest.json").read_text())["version"]
     files = sorted(
-        p for p in COMPONENT.rglob("*") if p.is_file() and p.suffix in {".py", ".json", ".txt"}
+        p
+        for p in COMPONENT.rglob("*")
+        if p.is_file() and p.suffix in {".py", ".json", ".txt", ".yaml"}
     )
     files = [p for p in files if "__pycache__" not in p.parts]
     assert files and (COMPONENT / "__init__.py") in files

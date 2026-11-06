@@ -57,6 +57,8 @@ The button requires [My Home Assistant](https://my.home-assistant.io/) configure
      const.py
      manifest.json
      protocol.py
+     services.py
+     services.yaml
      strings.json
      translations/en.json
      UPSTREAM_LICENSE.txt
@@ -107,6 +109,35 @@ The remote ID accepts one to four hexadecimal digits; the XOR key accepts one to
 Setup stores a transmitter registry reference that survives entity renaming. Use the integration entry's **Reconfigure** menu to change the adapter, remote ID, XOR key, lamp name, repeat count or Night/Timer assignment. Reconfiguration sends no RF commands. A missing transmitter registry entry requires reconfiguration; an offline adapter leaves buttons unavailable until it returns.
 
 The project is licensed under **MIT**; see [LICENSE](LICENSE). Upstream protocol attribution and its MIT notice are retained separately in `custom_components/eyocean/UPSTREAM_LICENSE.txt`.
+
+## Raw RF diagnostic action
+
+The administrator-only **EYOCEAN: Send raw RF waveform** action (`eyocean.send_raw`)
+sends an explicitly supplied waveform through a native Home Assistant RF transmitter.
+It does not contact an ESPHome web server, learn a remote, pair an appliance, or send
+anything during setup. It is for controlled diagnostics, not confirmed support for
+other remote protocols.
+
+In **Developer tools → Actions**, select the action and supply:
+
+- `transmitter`: a `radio_frequency` entity ID or its entity-registry UUID.
+- `timings`: an actual list of signed integer microseconds, alternating positive marks
+  and negative spaces. Start positive and end negative, including the intended final gap.
+- `repeats`: total transmissions from 1 to 20; defaults to one.
+
+The waveform must contain 2–4096 timings, each with an absolute duration of
+1–500000 microseconds. The total encoded duration including repeats is limited to
+five seconds. Frequency is fixed to 433.92 MHz OOK. Receiver timings can be distorted;
+successful transmission does not establish that a captured waveform will operate an
+appliance. Respect RF duty-cycle limits and local regulations.
+
+Raw requests share the integration's transmitter lock with lamp buttons and wait for
+the encoded burst duration. Adapter-internal repeat delays are not included in that
+estimate. Requests fail if the adapter is unavailable or rejects the command; no retry
+is performed. This action bypasses any ESPHome switch guarding local lamp-button
+scripts, just like other HA RF proxy requests.
+
+Install the updated integration and restart Home Assistant to register the action.
 
 ## ESPHome proxy examples
 

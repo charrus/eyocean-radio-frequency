@@ -85,6 +85,121 @@ async def test_buttons_use_native_rf_and_do_not_invent_state(hass, transmitter, 
     assert hass.states.get(transmitter.entity_id).state != "unknown"
 
 
+async def test_raw_service_uses_native_transmitter(hass, transmitter, entry):
+    timings = [280, -400, 610, -11700]
+    assert transmitter.commands == []
+    await hass.services.async_call(
+        "eyocean",
+        "send_raw",
+        {"transmitter": entry.data["transmitter"], "timings": timings, "repeats": 8},
+        blocking=True,
+    )
+    assert len(transmitter.commands) == 1
+    command = transmitter.commands[0]
+    assert command.frequency == 433_920_000
+    assert command.get_raw_timings() == timings
+    assert command.repeat_count == 7
+    assert hass.states.get(transmitter.entity_id).state != "unknown"
+
+
+async def test_raw_service_refuses_unavailable_transmitter(hass, transmitter, entry):
+    transmitter._attr_available = False
+    transmitter.async_write_ha_state()
+    await hass.async_block_till_done()
+    with pytest.raises(HomeAssistantError, match="unavailable"):
+        await hass.services.async_call(
+            "eyocean",
+            "send_raw",
+            {"transmitter": entry.data["transmitter"], "timings": [250, -250]},
+            blocking=True,
+        )
+    assert transmitter.commands == []
+
+
+@pytest.mark.parametrize("target", ["radio_frequency.missing", "button.desk_power_toggle"])
+async def test_raw_service_rejects_invalid_target(hass, transmitter, entry, target):
+    with pytest.raises(HomeAssistantError):
+        await hass.services.async_call(
+            "eyocean",
+            "send_raw",
+            {"transmitter": target, "timings": [250, -250]},
+            blocking=True,
+        )
+    assert transmitter.commands == []
+
+
+async def test_raw_service_failure_does_not_update_timestamp(hass, transmitter, entry):
+    previous = hass.states.get(transmitter.entity_id).state
+    transmitter.fail = True
+    with pytest.raises(HomeAssistantError, match="Test transmitter failure"):
+        await hass.services.async_call(
+            "eyocean",
+            "send_raw",
+            {"transmitter": transmitter.entity_id, "timings": [250, -250]},
+            blocking=True,
+        )
+    assert transmitter.commands == []
+    assert hass.states.get(transmitter.entity_id).state == previous
+
+
+async def test_raw_service_shares_button_lock_after_rename(hass, transmitter, entry, monkeypatch):
+    from custom_components.eyocean import services as services_module
+
+    registry = er.async_get(hass)
+    registry.async_update_entity(transmitter.entity_id, new_entity_id="radio_frequency.renamed_tx")
+    await hass.async_block_till_done()
+    sleeping = asyncio.Event()
+    release = asyncio.Event()
+    delays = []
+
+    async def hold_airtime(delay):
+        delays.append(delay)
+        sleeping.set()
+        await release.wait()
+
+    monkeypatch.setattr(services_module, "asyncio", SimpleNamespace(sleep=hold_airtime))
+    raw = asyncio.create_task(
+        hass.services.async_call(
+            "eyocean",
+            "send_raw",
+            {"transmitter": entry.data["transmitter"], "timings": [250, -250], "repeats": 2},
+            blocking=True,
+        )
+    )
+    button_task = None
+    try:
+        await asyncio.wait_for(sleeping.wait(), timeout=1)
+        assert entry.runtime_data.locked()
+        assert len(transmitter.commands) == 1
+        assert delays == [0.001]
+        button_task = asyncio.create_task(
+            hass.services.async_call(
+                "button",
+                "press",
+                {"entity_id": "button.desk_power_toggle"},
+                blocking=True,
+            )
+        )
+        await asyncio.sleep(0)
+        assert len(transmitter.commands) == 1
+    finally:
+        release.set()
+        await asyncio.gather(raw, *([button_task] if button_task else []))
+    assert len(transmitter.commands) == 2
+    assert transmitter.commands[1].frame == 0xBAD1511F
+
+
+async def test_raw_service_rejects_invalid_waveform(hass, transmitter, entry):
+    with pytest.raises(HomeAssistantError, match="alternate"):
+        await hass.services.async_call(
+            "eyocean",
+            "send_raw",
+            {"transmitter": transmitter.entity_id, "timings": [True, -250]},
+            blocking=True,
+        )
+    assert transmitter.commands == []
+
+
 @pytest.mark.parametrize("use_entity_id", [False, True])
 async def test_entries_sharing_transmitter_wait_for_burst_airtime(
     hass, transmitter, entry, monkeypatch, use_entity_id
